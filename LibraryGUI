@@ -1,0 +1,581 @@
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Container;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.GridLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.WindowEvent;
+import java.awt.event.WindowListener;
+import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+
+import jxl.read.biff.BiffException;
+import jxl.write.WriteException;
+
+/**
+ * The main class that is used to display the Library GUI and interact with it.
+ * 
+ * @author Allie Rose Brenon
+ * @version 03/02/2015
+ */
+public class LibraryGUI {
+	LibCreate myLibrary;
+	JFrame frame;
+	JTextField textTitleSearch;
+	JTextField textAuthorSearch;
+	JFrame normBookframe;
+	JTextArea textBook;
+	JPanel inStatus;
+	JButton checkIn;
+	JButton checkOut;
+	JPanel bookFrame;
+
+	/**
+	 * Constructor, creates a new LibCreate using the file libraryBooks.xls
+	 * 
+	 * @throws BiffException
+	 * @throws IOException
+	 */
+	public LibraryGUI() throws BiffException, IOException{
+		myLibrary = new LibCreate("libraryBooks.xls");
+	}
+
+	/**
+	 * This is the listener when book buttons are pushed.
+	 * @author AllieRose
+	 */
+	class BookListener implements ActionListener{
+		public Book myBook;
+		/**
+		 * Creates a new window to display information about a book
+		 * @param b	the Book the window is being created for
+		 */
+		public BookListener(Book b) {
+			this.myBook = b;
+		}
+		public void actionPerformed(ActionEvent e) {
+			//create the frame
+			normBookframe = new JFrame(myBook.title);
+			normBookframe.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+			bookFrame = new JPanel();
+			bookFrame.setLayout(new BorderLayout());
+			bookFrame.setPreferredSize(new Dimension(350, 300));
+
+			//title
+			JLabel title = new JLabel(myBook.title);
+			title.setBackground(Color.WHITE);
+			title.setFont(new Font("Ariel", 1, 24));
+			bookFrame.add(title, BorderLayout.PAGE_START);
+
+			//book information
+			textBook = new JTextArea();
+			textBook.append(myBook.authorFirst+" "+myBook.authorLast + "\n" + "\n");
+			textBook.setFont(new Font("Ariel", 2, 16));
+			textBook.setEditable(false);
+			textBook.append(myBook.description + "\n");
+			bookFrame.add(textBook, BorderLayout.CENTER);
+
+			//check in or out button
+			checkIn = new JButton("Check in!");
+			checkOut = new JButton("Check out!");
+			if (myBook.status == Book.Inorout.IN){
+				bookFrame.add(checkOut, BorderLayout.PAGE_END);
+				checkOut.addActionListener(new CheckOutListener(myBook));
+			} else if (myBook.status == Book.Inorout.OUT) {
+				bookFrame.add(checkIn, BorderLayout.PAGE_END);
+				checkIn.addActionListener(new CheckInListener(myBook));
+			}
+
+			//display current status using color
+			inStatus = new JPanel();
+			if (myBook.status == Book.Inorout.IN){
+				textBook.append("Checked in: " + myBook.dateIn + "\n" + "Shelf: "+ myBook.locationShelf + " Row: " + myBook.locationOnShelf);
+				inStatus.setBackground(Color.GREEN);
+			} else {
+				textBook.append("Checked out: " + myBook.dateOut);
+				inStatus.setBackground(Color.RED);
+			}
+			bookFrame.add(inStatus, BorderLayout.LINE_END);
+
+			normBookframe.getContentPane().add(bookFrame, BorderLayout.CENTER);
+			normBookframe.pack();
+			normBookframe.setVisible(true);
+		}
+	}
+	/**
+	 * Listener for the check out button, implements the <code> Book.checkOut() </code> method.
+	 * @author AllieRose
+	 *
+	 */
+	private class CheckOutListener implements ActionListener {
+		Book bookOut;
+		public CheckOutListener(Book b){
+			this.bookOut = b;
+		}
+		public void actionPerformed(ActionEvent e) {
+			bookOut.checkOut();
+
+			//repaint to match new status
+			textBook.append("\nChecked out: " + bookOut.dateOut);
+			inStatus.setBackground(Color.RED);
+			bookFrame.remove(checkOut);
+			bookFrame.add(checkIn, BorderLayout.PAGE_END);
+			checkIn.addActionListener(new CheckInListener(bookOut));
+		}
+	}
+	/**
+	 * Listener for the check in button, implements the <code> Book.checkIn() </code> method.
+	 * @author AllieRose
+	 *
+	 */
+	private class CheckInListener implements ActionListener {
+		Book bookIn;
+		public CheckInListener(Book b){
+			this.bookIn = b;
+		}
+		public void actionPerformed(ActionEvent e) {
+			bookIn.checkIn();
+
+			//repaint to match new status
+			textBook.append("\nChecked in: " + bookIn.dateIn + "\n" + "Shelf: "+ bookIn.locationShelf + " Row: " + bookIn.locationOnShelf);
+			inStatus.setBackground(Color.GREEN);
+			bookFrame.remove(checkIn);   
+			bookFrame.add(checkOut, BorderLayout.PAGE_END);
+			checkOut.addActionListener(new CheckOutListener(bookIn));
+		}
+	}
+
+	/**
+	 * Uses bubbleSort to sort the Books by alphabetical order by title
+	 * @author AllieRose
+	 */
+	private class TitleSortListener implements ActionListener {
+		public void actionPerformed(ActionEvent e) {
+			for (int i = 0; i < (myLibrary.libBooks.size()-1); i++){
+				int min = i;
+				for (int j = i+1; j < myLibrary.libBooks.size(); j++){
+					if (myLibrary.libBooks.get(j).title.compareToIgnoreCase(myLibrary.libBooks.get(min).title)<0){
+						min = j;
+					}
+				}
+				Book temp = myLibrary.libBooks.get(i);
+				myLibrary.libBooks.set(i, myLibrary.libBooks.get(min));
+				myLibrary.libBooks.set(min, temp);
+			}
+			try {
+				createAndShowGUI();			//recreate the GUI to reflect the changes
+			} catch (BiffException e1) {
+				e1.printStackTrace();
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+		}
+	}
+	/**
+	 * Uses bubbleSort to sort the Books by alphabetical order by author's last name
+	 * @author AllieRose
+	 */
+	private class AuthorSortListener implements ActionListener {
+		public void actionPerformed(ActionEvent e) {
+			for (int i = 0; i < (myLibrary.libBooks.size()-1); i++){
+				int min = i;
+				for (int j = i+1; j < myLibrary.libBooks.size(); j++){
+					if (myLibrary.libBooks.get(j).authorLast.compareToIgnoreCase(myLibrary.libBooks.get(min).authorLast)<0){
+						min = j;
+					}
+				}
+				Book temp = myLibrary.libBooks.get(i);
+				myLibrary.libBooks.set(i, myLibrary.libBooks.get(min));
+				myLibrary.libBooks.set(min, temp);
+			}
+			try {
+				createAndShowGUI();			//recreate the GUI to reflect the changes
+			} catch (BiffException e1) {
+				e1.printStackTrace();
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+		}
+	}
+
+	/**
+	 * Uses an input string that it compares to all the book titles and returns all the Books whose titles contain the string.
+	 * @author AllieRose
+	 *
+	 */
+	private class SearchTitleListener implements ActionListener {
+		public void actionPerformed(ActionEvent e) {
+			String getUserIn = textTitleSearch.getText();
+			int xTi = 0;		//used for offset
+			int yTi = 0;		//used for offset
+			for (Book b: myLibrary.libBooks){
+				String ti = "the"+b.title.toLowerCase();		//add "the" to deal with the titles that include ", The" at the end
+				ti = ti.replaceAll("[^A-Za-z0-9]", "");			//remove all non-alphanumeric characters, including spaces
+				String input = getUserIn.toLowerCase();
+				input = input.replaceAll("[^A-Za-z0-9]", "");	//remove all non-alphanumeric characters, including spaces
+				if (ti.contains(input)){
+					//create the frame
+					normBookframe = new JFrame(b.title);
+					normBookframe.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+					bookFrame = new JPanel();
+					bookFrame.setLayout(new BorderLayout());
+					bookFrame.setPreferredSize(new Dimension(350, 300));
+
+					//title
+					JLabel title = new JLabel(b.title);
+					title.setBackground(Color.WHITE);
+					title.setFont(new Font("Ariel", 1, 24));
+					bookFrame.add(title, BorderLayout.PAGE_START);
+
+					//book information
+					textBook = new JTextArea();
+					textBook.append(b.authorFirst+" "+b.authorLast+ "\n" + "\n");
+					textBook.setFont(new Font("Ariel", 2, 16));
+					textBook.setEditable(false);
+					textBook.append(b.description + "\n");
+					bookFrame.add(textBook, BorderLayout.CENTER);
+
+					//check in or out button
+					checkIn = new JButton("Check in!");
+					checkOut = new JButton("Check out!");
+					if (b.status == Book.Inorout.IN){
+						bookFrame.add(checkOut, BorderLayout.PAGE_END);
+						checkOut.addActionListener(new CheckOutListener(b));
+					} else if (b.status == Book.Inorout.OUT) {
+						bookFrame.add(checkIn, BorderLayout.PAGE_END);
+						checkIn.addActionListener(new CheckInListener(b));
+					}
+
+					//display current status using color
+					inStatus = new JPanel();
+					if (b.status == Book.Inorout.IN){
+						textBook.append("Checked in: " + b.dateIn + "\n" + "Shelf: "+ b.locationShelf + " Row: " + b.locationOnShelf);
+						inStatus.setBackground(Color.GREEN);
+					} else {
+						textBook.append("Checked out: " + b.dateOut);
+						inStatus.setBackground(Color.RED);
+					}
+					bookFrame.add(inStatus, BorderLayout.LINE_END);
+
+					normBookframe.getContentPane().add(bookFrame, BorderLayout.CENTER);
+					normBookframe.pack();
+					normBookframe.setLocation(xTi, yTi);
+					normBookframe.setVisible(true);
+
+					//set offset for future book windows so multiple tiles can be viewed
+					if (xTi < 700){
+						xTi += 350;
+					} else {
+						xTi = 0;
+						yTi +=100;
+					}
+
+				}
+			}
+		}
+	}
+
+	/**
+	 * Uses an input string that it compares to all the book authors and returns all the Books whose author's first or last names contain the string.
+	 * @author AllieRose
+	 *
+	 */
+	private class SearchAuthorListener implements ActionListener {
+		public void actionPerformed(ActionEvent e) {
+			String getUserInAu = textAuthorSearch.getText();
+			int xAu = 0;			//used for offset
+			int yAu = 0;			//used for offset
+			for (Book b: myLibrary.libBooks){
+				String au = b.authorLast.toLowerCase() + b.authorFirst.toLowerCase() + b.authorLast.toLowerCase(); //concatenates the author's first and last names so they can be searched in any order 
+				au = au.replaceAll("[^A-Za-z]", "");				//remove all non-alphabetic characters, including spaces
+				String input = getUserInAu.toLowerCase();
+				input = input.replaceAll("[^A-Za-z]", "");			//remove all non-alphabetic characters, including spaces
+				if (au.contains(input)){
+					//create the frame
+					normBookframe = new JFrame(b.title);
+					normBookframe.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+					bookFrame = new JPanel();
+					bookFrame.setLayout(new BorderLayout());
+					bookFrame.setPreferredSize(new Dimension(350, 300));
+
+					//title
+					JLabel title = new JLabel(b.title);
+					title.setBackground(Color.WHITE);
+					title.setFont(new Font("Ariel", 1, 24));
+					bookFrame.add(title, BorderLayout.PAGE_START);
+
+					//book information
+					textBook = new JTextArea();
+					textBook.append(b.authorFirst+" "+b.authorLast+ "\n" + "\n");
+					textBook.setFont(new Font("Ariel", 2, 16));
+					textBook.setEditable(false);
+					textBook.append(b.description + "\n");
+					bookFrame.add(textBook, BorderLayout.CENTER);
+
+					//check in or out button
+					checkIn = new JButton("Check in!");
+					checkOut = new JButton("Check out!");
+					if (b.status == Book.Inorout.IN){
+						bookFrame.add(checkOut, BorderLayout.PAGE_END);
+						checkOut.addActionListener(new CheckOutListener(b));
+					} else if (b.status == Book.Inorout.OUT) {
+						bookFrame.add(checkIn, BorderLayout.PAGE_END);
+						checkIn.addActionListener(new CheckInListener(b));
+					}
+
+					//display current status using color
+					inStatus = new JPanel();
+					if (b.status == Book.Inorout.IN){
+						textBook.append("Checked in: " + b.dateIn + "\n" + "Shelf: "+ b.locationShelf + " Row: " + b.locationOnShelf);
+						inStatus.setBackground(Color.GREEN);
+					} else {
+						textBook.append("Checked out: " + b.dateOut);
+						inStatus.setBackground(Color.RED);
+					}
+					bookFrame.add(inStatus, BorderLayout.LINE_END);
+
+					normBookframe.getContentPane().add(bookFrame, BorderLayout.CENTER);
+					normBookframe.pack();
+					normBookframe.setLocation(xAu, yAu);
+					normBookframe.setVisible(true);
+
+					//set offset for future book windows so multiple tiles can be viewed
+					if (xAu < 700){
+						xAu += 350;
+					} else {
+						xAu = 0;
+						yAu +=100;
+					}
+
+				}
+			}
+		}
+	}
+	/**
+	 * Creates a new book and adds it to the list.
+	 * @author AllieRose
+	 *
+	 */
+	private class NewBookListener implements ActionListener {
+		public void actionPerformed(ActionEvent e) {
+			//create the frame
+			normBookframe = new JFrame("Add a New Book!");
+			normBookframe.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+			bookFrame = new JPanel();
+			bookFrame.setLayout(new BorderLayout());
+			bookFrame.setPreferredSize(new Dimension(350, 300));
+
+			//title
+			JTextField title = new JTextField("Title");
+			title.setBackground(Color.WHITE);
+			title.setFont(new Font("Ariel", 1, 24));
+			bookFrame.add(title, BorderLayout.PAGE_START);
+
+			//book information
+			JTextField authorFirst = new JTextField("Author");
+			authorFirst.setFont(new Font("Ariel", 2, 16));
+			JTextField authorLast = new JTextField("Last Name");
+			authorLast.setFont(new Font("Ariel", 2, 16));
+			JTextField shelf = new JTextField("Shelf");
+			shelf.setFont(new Font("Ariel", 2, 16));
+			JTextField onShelf = new JTextField("Row");
+			onShelf.setFont(new Font("Ariel", 2, 16));
+
+			textBook = new JTextArea();
+			textBook.setEditable(false);
+
+			JButton submitButton = new JButton("Submit");
+
+			JPanel smallFrame = new JPanel();
+			smallFrame.add(authorFirst);
+			smallFrame.add(authorLast);
+			smallFrame.add(shelf);
+			smallFrame.add(onShelf);
+			smallFrame.add(textBook);
+			smallFrame.add(submitButton);
+			submitButton.addActionListener(new AddBookListener(title.getText(), authorFirst.getText(), authorLast.getText(), shelf.getText(), onShelf.getText()));
+			bookFrame.add(smallFrame, BorderLayout.CENTER);
+
+			//display current status using color
+			inStatus = new JPanel();
+			textBook.append("Checked in: " + new SimpleDateFormat("MM/dd/yyyy").format(Calendar.getInstance().getTime()));
+			inStatus.setBackground(Color.GREEN);
+
+			bookFrame.add(inStatus, BorderLayout.LINE_END);
+
+			normBookframe.getContentPane().add(bookFrame, BorderLayout.CENTER);
+			normBookframe.pack();
+			normBookframe.setVisible(true);
+		}
+	}
+
+	/**
+	 * Creates a new book and adds it to the list.
+	 * @author AllieRose
+	 *
+	 */
+	private class AddBookListener implements ActionListener {
+		String title;
+		String authorFirst;
+		String authorLast;
+		String shelf;
+		String onShelf;
+		public AddBookListener(String title, String authorFirst, String authorLast, String shelf, String onShelf){
+			title = this.title;
+			authorFirst = this.authorFirst;
+			authorLast = this.authorLast;
+			shelf = this.shelf;
+			onShelf = this.onShelf;
+		}
+		public void actionPerformed(ActionEvent e) {
+			Book newBook = new Book(title ,authorFirst, authorLast, shelf, onShelf, new SimpleDateFormat("MM/dd/yyyy").format(Calendar.getInstance().getTime()), "IN");
+			myLibrary.libBooks.add(newBook);
+
+			try {
+				createAndShowGUI();			//recreate the GUI to reflect the changes
+			} catch (BiffException e1) {
+				e1.printStackTrace();
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+		}
+	}
+
+	/**
+	 * Window Listener that generates an output file to libraryBooks.xls when the window is closed.
+	 * @author AllieRose
+	 *
+	 */
+	private class MyWindowClose implements WindowListener{
+		public void windowClosing(WindowEvent arg0) {
+			try {
+				new LibClose(myLibrary.libBooks);
+			} catch (BiffException e) {
+				e.printStackTrace();
+			} catch (WriteException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+		//extra WindowEvents included because they are required
+		public void windowActivated(WindowEvent arg0) {
+		}
+		public void windowClosed(WindowEvent arg0) {
+		}
+		public void windowDeactivated(WindowEvent arg0) {
+		}
+		public void windowDeiconified(WindowEvent arg0) {
+		}
+		public void windowIconified(WindowEvent arg0) {	
+		}
+		public void windowOpened(WindowEvent arg0) {
+		}
+	}
+
+	public void createComponents(Container pane) throws BiffException, IOException {
+
+		//create window
+		JPanel panel = new JPanel();
+		panel.setLayout(new BorderLayout());
+
+		//sidebar includes sort and search buttons
+		JPanel sidebar = new JPanel();
+		sidebar.setLayout(new BorderLayout());
+		sidebar.setPreferredSize(new Dimension(250,500));
+		JLabel welcome = new JLabel("<html><center>Welcome to the Library!<br>What would you like to do today?</center></html>");
+		welcome.setFont(new Font("Ariel", 1, 16));
+		JPanel centerSide = new JPanel();
+		JButton sortTitle = new JButton("Sort by Title");
+		JButton sortAuthor = new JButton("Sort by Author");
+		JButton searchTitle = new JButton("Search by Title");
+		textTitleSearch = new JTextField();
+		textTitleSearch.setPreferredSize(new Dimension(250, 30));
+		JButton searchAuthor = new JButton("Search by Author");
+		textAuthorSearch = new JTextField();
+		textAuthorSearch.setPreferredSize(new Dimension(250, 30));
+		JButton addBook = new JButton("Add a New Book");
+
+		//add content and listeners
+		sidebar.add(welcome, BorderLayout.PAGE_START);
+		centerSide.add(sortTitle);
+		sortTitle.addActionListener(new TitleSortListener());
+		centerSide.add(sortAuthor);
+		sortAuthor.addActionListener(new AuthorSortListener());
+		centerSide.add(textTitleSearch);
+		centerSide.add(searchTitle);
+		searchTitle.addActionListener(new SearchTitleListener());
+		centerSide.add(textAuthorSearch);
+		centerSide.add(searchAuthor);
+		searchAuthor.addActionListener(new SearchAuthorListener());
+		centerSide.add(addBook);
+		addBook.addActionListener(new NewBookListener());
+		sidebar.add(centerSide, BorderLayout.CENTER);
+
+		//the main display holds the book buttons in a scrolling pane
+		JPanel main = new JPanel();
+		main.setLayout(new BorderLayout());
+		JPanel books = new JPanel();
+		books.setLayout(new GridLayout(0,5));
+		JScrollPane scrollPane = new JScrollPane(books);
+		scrollPane.setPreferredSize(new Dimension(550, 500));
+		for (Book b: myLibrary.libBooks){
+			JButton bookButton = new JButton();
+			bookButton.setText("<html><b>"+b.title+"</b><br>"+b.authorFirst+" "+b.authorLast+"<br></html>");
+			bookButton.setFont(new Font("Ariel", 4, 10));
+			bookButton.setOpaque(true);
+			bookButton.setBackground(new Color( (int)(Math.random()*256), (int)(Math.random()*256), (int)(Math.random()*256)));
+			bookButton.setPreferredSize(new Dimension(105,105));
+			books.add(bookButton);
+			bookButton.addActionListener(new BookListener(b));
+		}
+		main.add(scrollPane);
+
+		panel.add(sidebar, BorderLayout.LINE_END);
+		panel.add(main, BorderLayout.CENTER);
+		pane.add(panel);
+
+	}
+	public void createAndShowGUI() throws BiffException, IOException {
+		// Make sure we have nice window decorations.
+		JFrame.setDefaultLookAndFeelDecorated(true);
+
+		// Create and set up the window.
+		frame = new JFrame("Library");
+		frame.addWindowListener(new MyWindowClose());
+		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+		// Add components
+		createComponents(frame.getContentPane());
+
+		// Display the window.
+		frame.pack();
+		frame.setVisible(true);
+	}
+	public static void main(String[] args) throws BiffException, IOException {
+		final LibraryGUI GUI = new LibraryGUI();
+		javax.swing.SwingUtilities.invokeLater(new Runnable() {
+			public void run() {
+				try {
+					GUI.createAndShowGUI();
+				} catch (BiffException e) {
+					e.printStackTrace();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		});
+	}
+
+}
